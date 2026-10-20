@@ -1,0 +1,24 @@
+# 扫描输出：含客户代码的命中明细，不进仓库
+reports/
+*.html.bak
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+build/
+dist/
+
+# 编辑器与系统
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# 本地私有规则库与真实客户配置（示例样本 samples/vuln_demo/.env 是虚构数据，故意保留）
+rules.local.json
+customers/
+*.local.json

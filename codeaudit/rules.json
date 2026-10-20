@@ -1,0 +1,940 @@
+{
+  "version": "1.1.0",
+  "updated": "2026-09-12",
+  "deny_patterns": [
+    "(?i)(password|passwd|pwd|token|secret|api[_-]?key|apikey)\\s*[:=]\\s*[\"']?(os\\.environ|os\\.getenv|process\\.env|getenv|environ\\[|ENV\\[|System\\.getenv|settings\\.|config\\.|Config\\.|\\$\\{|\\{\\{|<%=|secretRef|SecretKeyRef)",
+    "(?i)(password|passwd|pwd|token|secret|api[_-]?key|apikey)\\s*[:=]\\s*[\"']?(xxx+|yyy+|zzz+|your[_-]?\\w*|example\\w*|placeholder|changeme|change_me|redacted|dummy|foobar|test123|abc123|todo|null|none|nil|empty|\\.\\.\\.|\\*\\*\\*+|<[^>]{1,40}>)[\"']?",
+    "(?i)(password|token|secret)\\s*[:=]\\s*[\"'][\"']",
+    "(?i)(api[_-]?key|token|secret)\\s*[:=]\\s*[\"']?(sk-xxx|your_api_key|YOUR_|REPLACE_|INSERT_)"
+  ],
+  "rules": [
+    {
+      "id": "SEC101",
+      "title": "硬编码 AWS Access Key",
+      "severity": "critical",
+      "cwe": "CWE-798",
+      "langs": [
+        "*"
+      ],
+      "pattern": "AKIA[0-9A-Z]{16}",
+      "fix": "立即在 IAM 控制台吊销该密钥并轮换，改用环境变量或 Secrets Manager / Vault 注入。已泄露的密钥可能已被扫描器抓取，轮换前先查 CloudTrail 有无异常调用。",
+      "verify": "aws sts get-caller-identity 用该 key 试调用；在 CloudTrail 中检索该 AccessKeyId 的调用记录。",
+      "tags": [
+        "credential",
+        "cloud"
+      ]
+    },
+    {
+      "id": "SEC102",
+      "title": "硬编码 AWS Secret Access Key",
+      "severity": "critical",
+      "cwe": "CWE-798",
+      "langs": [
+        "*"
+      ],
+      "pattern": "(?i)aws[_-]?secret[_-]?access[_-]?key\\s*[:=]\\s*[\"'][A-Za-z0-9/+=]{40}[\"']",
+      "fix": "吊销并轮换该密钥，改用 IAM Role（EC2/ECS/Lambda 角色）或 Secrets Manager 动态注入，代码中只保留变量名。",
+      "tags": [
+        "credential",
+        "cloud"
+      ]
+    },
+    {
+      "id": "SEC103",
+      "title": "源码中存在私钥内容",
+      "severity": "critical",
+      "cwe": "CWE-321",
+      "langs": [
+        "*"
+      ],
+      "pattern": "-----BEGIN (RSA|EC|OPENSSH|DSA|PGP) PRIVATE KEY-----",
+      "fix": "私钥绝不可入库。移出仓库、吊销对应公钥并重新签发；用 git filter-repo 清理历史提交，密钥托管到 KMS 或专用密钥服务。",
+      "tags": [
+        "credential",
+        "crypto"
+      ]
+    },
+    {
+      "id": "SEC104",
+      "title": "硬编码口令",
+      "severity": "high",
+      "cwe": "CWE-798",
+      "langs": [
+        "*"
+      ],
+      "pattern": "(?i)(password|passwd|pwd|db_pass|dbpass)\\s*[:=]\\s*[\"'][^\"'\\s]{4,64}[\"']",
+      "fix": "改为从环境变量或配置中心读取；若该口令在测试环境真实可用，同步在对应系统改密。",
+      "tags": [
+        "credential"
+      ]
+    },
+    {
+      "id": "SEC105",
+      "title": "硬编码 API Key / Token",
+      "severity": "high",
+      "cwe": "CWE-798",
+      "langs": [
+        "*"
+      ],
+      "pattern": "(?i)(api[_-]?key|apikey|secret[_-]?key|access[_-]?token|auth[_-]?token)\\s*[:=]\\s*[\"'][A-Za-z0-9_\\-\\.]{16,}[\"']",
+      "fix": "迁移到环境变量或密钥管理服务；确认该 key 的权限范围并按最小权限收敛。",
+      "tags": [
+        "credential"
+      ]
+    },
+    {
+      "id": "SEC106",
+      "title": "硬编码 JWT 签名密钥",
+      "severity": "high",
+      "cwe": "CWE-798",
+      "langs": [
+        "*"
+      ],
+      "pattern": "(?i)jwt[_-]?secret\\s*[:=]\\s*[\"'][^\"']{8,}[\"']",
+      "fix": "JWT 密钥泄露等于任意用户可伪造登录态。轮换密钥会使全部旧 token 失效，需评估灰度方案；改为从密钥服务读取。",
+      "verify": "用该密钥本地签发一个管理员 token，打到线上接口验证是否通过鉴权。",
+      "tags": [
+        "credential",
+        "auth"
+      ]
+    },
+    {
+      "id": "SEC107",
+      "title": "大模型 API Key 硬编码",
+      "severity": "critical",
+      "cwe": "CWE-798",
+      "langs": [
+        "*"
+      ],
+      "pattern": "\\b(sk-(proj-)?[A-Za-z0-9_\\-]{20,}|sk-ant-[A-Za-z0-9_\\-]{20,})\\b",
+      "fix": "大模型 key 通常直接绑定计费账户，泄露即被盗刷。立即在平台吊销并轮换，服务端中转调用，前端只走自己的后端网关。",
+      "tags": [
+        "credential",
+        "ai"
+      ]
+    },
+    {
+      "id": "SEC108",
+      "title": "硬编码 Slack / 协作平台 Token",
+      "severity": "high",
+      "cwe": "CWE-798",
+      "langs": [
+        "*"
+      ],
+      "pattern": "xox[baprs]-[0-9A-Za-z\\-]{10,}",
+      "fix": "吊销该 token 并重新授权，改用 OAuth 安装流程或环境变量注入。",
+      "tags": [
+        "credential"
+      ]
+    },
+    {
+      "id": "SEC109",
+      "title": "硬编码 GitHub Token",
+      "severity": "critical",
+      "cwe": "CWE-798",
+      "langs": [
+        "*"
+      ],
+      "pattern": "\\bgh[pousr]_[A-Za-z0-9]{36,}\\b",
+      "fix": "在 GitHub Settings → Developer settings 中吊销，检查该 token 的仓库读写范围，审查近期审计日志。",
+      "tags": [
+        "credential"
+      ]
+    },
+    {
+      "id": "SEC110",
+      "title": "硬编码 Google API Key",
+      "severity": "high",
+      "cwe": "CWE-798",
+      "langs": [
+        "*"
+      ],
+      "pattern": "AIza[0-9A-Za-z_\\-]{35}",
+      "fix": "在 GCP 控制台吊销该 key，重启用 Application Default Credentials 或密钥托管。",
+      "tags": [
+        "credential",
+        "cloud"
+      ]
+    },
+    {
+      "id": "SEC111",
+      "title": "数据库连接串明文含密码",
+      "severity": "critical",
+      "cwe": "CWE-798",
+      "langs": [
+        "*"
+      ],
+      "pattern": "(?i)\\b(mysql|postgres|postgresql|mongodb(\\+srv)?|redis|amqp|mssql)://[^:/@\\s\"']+:[^@/\\s\"']{3,}@",
+      "fix": "连接串中的口令等于数据库直接暴露。改为拆分 host/user/password 三处独立注入，口令走密钥服务；确认该库是否对公网开放。",
+      "verify": "用该连接串尝试从外网连通，检查数据库是否监听 0.0.0.0 且无白名单。",
+      "tags": [
+        "credential",
+        "database"
+      ]
+    },
+    {
+      "id": "SEC112",
+      "title": "硬编码阿里云 / 腾讯云 AccessKey",
+      "severity": "critical",
+      "cwe": "CWE-798",
+      "langs": [
+        "*"
+      ],
+      "pattern": "\\b(LTAI[0-9A-Za-z]{12,}|AKID[A-Za-z0-9]{13,})\\b",
+      "fix": "在云控制台吊销该 AK 并轮换，改用 RAM 子账号 + STS 临时凭证；排查是否有异常 ECS/RDS 创建记录。",
+      "tags": [
+        "credential",
+        "cloud"
+      ]
+    },
+    {
+      "id": "SEC113",
+      "title": "密钥文件路径硬编码",
+      "severity": "medium",
+      "cwe": "CWE-798",
+      "langs": [
+        "*"
+      ],
+      "pattern": "(?i)(private[_-]?key[_-]?path|keyfile|key_file|secretfile)\\s*[:=]\\s*[\"'][^\"']+[\"']",
+      "fix": "密钥路径应来自配置而非硬编码，并确保该文件在部署环境的权限为 600 且不在 Web 目录下。",
+      "tags": [
+        "credential"
+      ]
+    },
+    {
+      "id": "SEC201",
+      "title": "SQL 语句由字符串拼接构造（Python）",
+      "severity": "high",
+      "cwe": "CWE-89",
+      "langs": [
+        "python"
+      ],
+      "pattern": "(?i)(select|insert\\s+into|update|delete\\s+from)\\b[^\\n]{0,140}(\\{[^}\\n]{0,60}\\}|%s|\\+\\s*[a-z_]\\w*|\\.format\\()",
+      "fix": "一律使用参数化查询：cursor.execute(sql, (param,))。禁止 f-string / format / % 拼接进 SQL。",
+      "tags": [
+        "injection",
+        "sql"
+      ]
+    },
+    {
+      "id": "SEC202",
+      "title": "SQL 语句由模板字符串构造（JS/TS）",
+      "severity": "high",
+      "cwe": "CWE-89",
+      "langs": [
+        "js",
+        "ts",
+        "vue"
+      ],
+      "pattern": "(?i)(select|insert\\s+into|update|delete\\s+from)\\b[^`';\\n]{0,140}\\$\\{",
+      "fix": "改用占位符参数化：db.query('... WHERE id = ?', [id])；ORM 用 where({ id }) 而不要原样拼接。",
+      "tags": [
+        "injection",
+        "sql"
+      ]
+    },
+    {
+      "id": "SEC203",
+      "title": "操作系统命令执行（os.system / popen）",
+      "severity": "high",
+      "cwe": "CWE-78",
+      "langs": [
+        "python"
+      ],
+      "pattern": "\\bos\\.(system|popen|spawn\\w*|exec\\w*)\\s*\\(",
+      "fix": "改用 subprocess.run([...], shell=False) 传参数列表；若参数来自外部输入，先做白名单校验。",
+      "tags": [
+        "injection",
+        "rce"
+      ]
+    },
+    {
+      "id": "SEC204",
+      "title": "subprocess 使用 shell=True",
+      "severity": "high",
+      "cwe": "CWE-78",
+      "langs": [
+        "python"
+      ],
+      "pattern": "subprocess\\.(run|call|Popen|check_output|check_call)\\s*\\([^)]{0,400}?shell\\s*=\\s*True",
+      "fix": "去掉 shell=True，把命令拆成参数列表；必须用 shell 时对输入做严格白名单。",
+      "tags": [
+        "injection",
+        "rce"
+      ]
+    },
+    {
+      "id": "SEC205",
+      "title": "动态代码执行 eval / exec（Python）",
+      "severity": "high",
+      "cwe": "CWE-95",
+      "langs": [
+        "python"
+      ],
+      "pattern": "(?<![\\w.])(eval|exec)\\s*\\(",
+      "fix": "绝大多数 eval/exec 都可以用字典映射或 ast.literal_eval 替代；如为表达式求值需求，改用受限解析器。",
+      "tags": [
+        "injection",
+        "rce"
+      ]
+    },
+    {
+      "id": "SEC206",
+      "title": "动态代码执行 eval（JS/TS）",
+      "severity": "high",
+      "cwe": "CWE-95",
+      "langs": [
+        "js",
+        "ts",
+        "vue",
+        "html"
+      ],
+      "pattern": "(?<![\\w.$])eval\\s*\\(",
+      "fix": "改用 JSON.parse 处理数据；确需动态执行时用 Function 构造器并严格限制输入来源。",
+      "tags": [
+        "injection",
+        "rce"
+      ]
+    },
+    {
+      "id": "SEC207",
+      "title": "PHP 命令执行函数",
+      "severity": "high",
+      "cwe": "CWE-78",
+      "langs": [
+        "php"
+      ],
+      "pattern": "(?<![\\w>])(system|exec|shell_exec|passthru|popen|proc_open|pcntl_exec)\\s*\\(",
+      "fix": "改用 escapeshellarg + 白名单；更彻底的方式是把外部命令调用改成库函数实现。",
+      "tags": [
+        "injection",
+        "rce"
+      ]
+    },
+    {
+      "id": "SEC208",
+      "title": "模板注入风险（SSTI）",
+      "severity": "high",
+      "cwe": "CWE-1336",
+      "langs": [
+        "python"
+      ],
+      "pattern": "(render_template_string\\s*\\(|Template\\s*\\(\\s*[^\"'\\s)]|jinja2\\.Template\\s*\\()",
+      "fix": "模板内容必须来自代码而非用户输入；需要动态模板时使用沙箱环境（SandboxedEnvironment）并禁用危险属性访问。",
+      "tags": [
+        "injection",
+        "ssti"
+      ]
+    },
+    {
+      "id": "SEC209",
+      "title": "动态模块导入",
+      "severity": "medium",
+      "cwe": "CWE-470",
+      "langs": [
+        "python"
+      ],
+      "pattern": "(__import__\\s*\\(|importlib\\.import_module\\s*\\(|getattr\\s*\\(\\s*\\w+\\s*,\\s*(req|request|params|user))",
+      "fix": "动态导入的模块名必须来自白名单映射表，不可直接使用外部输入。",
+      "tags": [
+        "injection"
+      ]
+    },
+    {
+      "id": "SEC301",
+      "title": "不安全反序列化 pickle",
+      "severity": "critical",
+      "cwe": "CWE-502",
+      "langs": [
+        "python"
+      ],
+      "pattern": "\\b(c?pickle|dill|joblib)\\.loads?\\s*\\(",
+      "fix": "pickle 反序列化等价于任意代码执行，且无安全模式。改用 JSON / MessagePack；必须处理不可信 pickle 时改用 hmac 签名校验来源。",
+      "verify": "构造一个 __reduce__ 返回 os.system 的 pickle 对象，观察目标是否执行命令。",
+      "tags": [
+        "deserialization",
+        "rce"
+      ]
+    },
+    {
+      "id": "SEC302",
+      "title": "yaml.load 未指定 SafeLoader",
+      "severity": "critical",
+      "cwe": "CWE-502",
+      "langs": [
+        "python"
+      ],
+      "pattern": "yaml\\.load\\s*\\((?![^)]*SafeLoader)(?![^)]*safe_load)",
+      "fix": "改为 yaml.safe_load()，或显式传 Loader=yaml.SafeLoader。full_load 同样危险。",
+      "tags": [
+        "deserialization",
+        "rce"
+      ]
+    },
+    {
+      "id": "SEC303",
+      "title": "marshal / shelve 反序列化",
+      "severity": "high",
+      "cwe": "CWE-502",
+      "langs": [
+        "python"
+      ],
+      "pattern": "\\b(marshal\\.loads?|shelve\\.open|jsonpickle\\.decode)\\s*\\(",
+      "fix": "marshal 与 pickle 同级危险，jsonpickle 亦可通过 __reduce__ 触发 RCE。改用纯 JSON 数据结构。",
+      "tags": [
+        "deserialization",
+        "rce"
+      ]
+    },
+    {
+      "id": "SEC304",
+      "title": "Java 原生反序列化",
+      "severity": "high",
+      "cwe": "CWE-502",
+      "langs": [
+        "java"
+      ],
+      "pattern": "new\\s+(ObjectInputStream|XMLDecoder|ObjectInputStream\\s*\\()",
+      "fix": "原生反序列化是 Java 反序列化 gadget 链的入口。改用 JSON，或启用 ObjectInputFilter 白名单类过滤。",
+      "tags": [
+        "deserialization"
+      ]
+    },
+    {
+      "id": "SEC305",
+      "title": "PHP unserialize",
+      "severity": "high",
+      "cwe": "CWE-502",
+      "langs": [
+        "php"
+      ],
+      "pattern": "(?<![\\w>])unserialize\\s*\\(",
+      "fix": "改用 json_decode；必须用 unserialize 时加 allowed_classes 白名单参数。",
+      "tags": [
+        "deserialization"
+      ]
+    },
+    {
+      "id": "SEC306",
+      "title": "Node 反序列化",
+      "severity": "high",
+      "cwe": "CWE-502",
+      "langs": [
+        "js",
+        "ts"
+      ],
+      "pattern": "(node-serialize|serialize\\.unserialize|require\\(['\"]node-serialize['\"]\\))",
+      "fix": "node-serialize 已被证明可通过 IIFE 执行任意代码，直接从依赖中移除。",
+      "tags": [
+        "deserialization"
+      ]
+    },
+    {
+      "id": "SEC307",
+      "title": ".NET 不安全反序列化",
+      "severity": "high",
+      "cwe": "CWE-502",
+      "langs": [
+        "cs"
+      ],
+      "pattern": "\\b(BinaryFormatter|NetDataContractSerializer|LosFormatter|SoapFormatter|TypeNameHandling\\.All)\\b",
+      "fix": "改用 System.Text.Json；若必须保留，启用 SerializationBinder 白名单并禁用 TypeNameHandling。",
+      "tags": [
+        "deserialization"
+      ]
+    },
+    {
+      "id": "SEC401",
+      "title": "文件路径由外部输入拼接（路径穿越）",
+      "severity": "high",
+      "cwe": "CWE-22",
+      "langs": [
+        "*"
+      ],
+      "pattern": "(?i)(open|readFile|readFileSync|createReadStream|sendFile|send_file|FileInputStream|new\\s+File)\\s*\\([^)\\n]{0,200}({{TAINT}}|\\.filename|user_?input)",
+      "fix": "拼接前用 os.path.realpath 解析并校验结果仍位于允许的根目录内；文件名改写为服务端生成的 ID。",
+      "tags": [
+        "filesystem",
+        "path-traversal"
+      ]
+    },
+    {
+      "id": "SEC402",
+      "title": "压缩包解压未校验条目路径（Zip Slip）",
+      "severity": "medium",
+      "cwe": "CWE-22",
+      "langs": [
+        "*"
+      ],
+      "pattern": "(?i)(extractall\\s*\\(|\\.extract\\s*\\(|unzip\\s+|tarfile\\.open\\s*\\()",
+      "fix": "逐个校验压缩包内条目名，拒绝包含 ../ 或绝对路径的条目；解压目标目录用固定路径。",
+      "tags": [
+        "filesystem"
+      ]
+    },
+    {
+      "id": "SEC403",
+      "title": "文件上传未做类型/后缀校验",
+      "severity": "medium",
+      "cwe": "CWE-434",
+      "langs": [
+        "*"
+      ],
+      "pattern": "(?i)(multer|formidable|busboy|FileField|MultipartFile|save\\s*\\()\\.?[^\\n]{0,120}(originalname|\\.filename|getOriginalFilename)",
+      "fix": "校验扩展名白名单 + 校验真实文件头（magic bytes）+ 存储目录禁止脚本执行（Nginx/Apache 层面关掉该目录的 PHP/JS 解析）。",
+      "verify": "上传 shell.php.jpg，确认返回路径是否能被当作脚本执行。",
+      "tags": [
+        "upload"
+      ]
+    },
+    {
+      "id": "SEC404",
+      "title": "过宽的文件权限",
+      "severity": "medium",
+      "cwe": "CWE-732",
+      "langs": [
+        "*"
+      ],
+      "pattern": "(chmod\\s*\\([^,)]+,\\s*0?777|chmod\\s+777|0o777|0777)",
+      "fix": "按最小权限设置，普通文件 644、可执行 755，禁止 777。",
+      "tags": [
+        "filesystem"
+      ]
+    },
+    {
+      "id": "SEC501",
+      "title": "服务端请求由外部输入决定（SSRF）",
+      "severity": "high",
+      "cwe": "CWE-918",
+      "langs": [
+        "python",
+        "js",
+        "ts",
+        "php",
+        "java"
+      ],
+      "pattern": "(?i)(requests\\.(get|post|put|delete|head)|httpx\\.\\w+|session\\.(get|post)|urlopen|urlretrieve|axios\\.\\w+|fetch|http\\.get|file_get_contents|curl_exec)\\s*\\([^)\\n]{0,200}{{TAINT}}",
+      "fix": "对目标地址做白名单域名校验，解析后再次校验 IP 不在内网段（127/8、10/8、172.16/12、192.168/16、169.254/16、::1）。",
+      "verify": "传入 http://169.254.169.254/latest/meta-data/ 与 http://127.0.0.1:PORT 观察回显。",
+      "tags": [
+        "ssrf",
+        "network"
+      ]
+    },
+    {
+      "id": "SEC502",
+      "title": "TLS 证书校验被关闭",
+      "severity": "high",
+      "cwe": "CWE-295",
+      "langs": [
+        "*"
+      ],
+      "pattern": "(?i)(verify\\s*=\\s*False|rejectUnauthorized\\s*:\\s*false|InsecureSkipVerify\\s*:\\s*true|NODE_TLS_REJECT_UNAUTHORIZED\\s*=\\s*['\"]?0|CURLOPT_SSL_VERIFYPEER\\s*,\\s*(0|false)|ssl\\._create_unverified_context)",
+      "fix": "恢复证书校验。若因自签名证书报错，应把该证书加入信任库，而不是关校验。关闭校验等于放弃中间人防护。",
+      "tags": [
+        "network",
+        "crypto"
+      ]
+    },
+    {
+      "id": "SEC503",
+      "title": "服务监听全部网卡",
+      "severity": "low",
+      "cwe": "CWE-1327",
+      "langs": [
+        "*"
+      ],
+      "pattern": "(?i)(host\\s*[:=]\\s*[\"']0\\.0\\.0\\.0[\"']|app\\.run\\([^)]*0\\.0\\.0\\.0|listen\\s*\\(\\s*\\d+\\s*,\\s*[\"']0\\.0\\.0\\.0)",
+      "fix": "确认该端口是否有防火墙与鉴权保护。仅内网使用的服务应绑定 127.0.0.1 或内网网卡。",
+      "tags": [
+        "network",
+        "config"
+      ]
+    },
+    {
+      "id": "SEC601",
+      "title": "使用弱哈希算法",
+      "severity": "medium",
+      "cwe": "CWE-327",
+      "langs": [
+        "*"
+      ],
+      "pattern": "(?i)(hashlib\\.(md5|sha1)|MessageDigest\\.getInstance\\(\\s*[\"'](MD5|SHA-?1)|crypto\\.createHash\\(\\s*[\"'](md5|sha1)|md5\\(|sha1\\()",
+      "fix": "口令存储改用 bcrypt / scrypt / Argon2 并加盐；完整性校验改用 SHA-256 及以上。",
+      "tags": [
+        "crypto"
+      ]
+    },
+    {
+      "id": "SEC602",
+      "title": "ECB 加密模式",
+      "severity": "high",
+      "cwe": "CWE-327",
+      "langs": [
+        "*"
+      ],
+      "pattern": "(?i)(MODE_ECB|AES/ECB|aes-\\d+-ecb|Cipher\\.getInstance\\(\\s*[\"'][^\"']*ECB)",
+      "fix": "ECB 相同明文块产出相同密文，会泄露数据结构。改用 AES-GCM（带认证）或 CBC + 随机 IV + HMAC。",
+      "tags": [
+        "crypto"
+      ]
+    },
+    {
+      "id": "SEC603",
+      "title": "已废弃的加密算法",
+      "severity": "medium",
+      "cwe": "CWE-327",
+      "langs": [
+        "*"
+      ],
+      "pattern": "(?i)\\b(DESede|\\bDES\\b|RC4|ARC4|Blowfish|MD4)\\b",
+      "fix": "改用 AES-256-GCM 或 ChaCha20-Poly1305。",
+      "tags": [
+        "crypto"
+      ]
+    },
+    {
+      "id": "SEC604",
+      "title": "IV 或盐值被硬编码",
+      "severity": "medium",
+      "cwe": "CWE-329",
+      "langs": [
+        "*"
+      ],
+      "pattern": "(?i)\\b(\\w*[_-])?(iv|nonce|salt)\\b\\s*[:=]\\s*(b?[\"'][A-Za-z0-9+/=_\\-]{8,}[\"']|bytes\\(\\s*\\d+\\s*\\))",
+      "fix": "IV/nonce 必须每次加密随机生成并随密文一起传输；盐值每个用户独立随机。",
+      "tags": [
+        "crypto"
+      ]
+    },
+    {
+      "id": "SEC605",
+      "title": "使用非密码学安全随机数",
+      "severity": "low",
+      "cwe": "CWE-338",
+      "langs": [
+        "*"
+      ],
+      "pattern": "(?i)(Math\\.random\\(\\)|random\\.(random|randint|randrange|choice|choices|sample|shuffle)\\s*\\(|new Random\\(\\))",
+      "fix": "涉及 token、验证码、重置链接、会话 ID 时改用 secrets / crypto.randomBytes / SecureRandom。",
+      "tags": [
+        "crypto"
+      ]
+    },
+    {
+      "id": "SEC606",
+      "title": "口令直接进入快速哈希",
+      "severity": "medium",
+      "cwe": "CWE-916",
+      "langs": [
+        "*"
+      ],
+      "pattern": "(?i)(hashlib\\.(md5|sha1|sha256)\\(\\s*(password|passwd|pwd)|(md5|sha1|sha256)\\s*\\(\\s*(password|passwd|pwd))",
+      "fix": "口令哈希必须使用慢哈希（bcrypt cost≥10 / Argon2id / scrypt），单纯加盐 SHA-256 仍可被 GPU 快速爆破。",
+      "tags": [
+        "crypto",
+        "auth"
+      ]
+    },
+    {
+      "id": "SEC701",
+      "title": "调试模式在生产配置中开启",
+      "severity": "high",
+      "cwe": "CWE-489",
+      "langs": [
+        "*"
+      ],
+      "pattern": "(?i)(debug\\s*=\\s*True|DEBUG\\s*=\\s*True|DEBUG\\s*[:=]\\s*['\"]?true|debug\\s*:\\s*true)",
+      "fix": "调试模式会暴露堆栈、源码片段，Flask 的调试器还带交互式控制台（可直接执行代码）。生产环境必须为 False，用环境变量区分。",
+      "verify": "访问一个报错接口，观察是否返回 Werkzeug 交互式调试页面。",
+      "tags": [
+        "config",
+        "info-leak"
+      ]
+    },
+    {
+      "id": "SEC702",
+      "title": "CORS 允许任意来源",
+      "severity": "high",
+      "cwe": "CWE-942",
+      "langs": [
+        "*"
+      ],
+      "pattern": "(?i)(allow_origins\\s*=\\s*\\[\\s*[\"']\\*|Access-Control-Allow-Origin[\"'\\s]*[:=][\"'\\s]*\\*|origin\\s*:\\s*[\"']\\*[\"']|cors\\(\\s*\\)|origins\\s*:\\s*\\[\\s*[\"']\\*[\"'])",
+      "fix": "改为显式来源白名单。若同时 allow_credentials=True 搭配 * 更为严重：任意站点都能带着用户 Cookie 读取接口数据。",
+      "tags": [
+        "config",
+        "auth"
+      ]
+    },
+    {
+      "id": "SEC703",
+      "title": "CSRF 防护被关闭",
+      "severity": "medium",
+      "cwe": "CWE-352",
+      "langs": [
+        "*"
+      ],
+      "pattern": "(?i)(csrf_exempt|@csrf\\.exempt|csrf\\s*[:=]\\s*false|CsrfViewMiddleware|csrf_protect\\s*=\\s*False)",
+      "fix": "确认豁免范围内是否包含状态修改接口（转账、改密、改配置）。这些接口必须保留 CSRF token 或改用 SameSite=Lax/Strict Cookie。",
+      "tags": [
+        "config",
+        "csrf"
+      ]
+    },
+    {
+      "id": "SEC704",
+      "title": "异常堆栈回显给客户端",
+      "severity": "medium",
+      "cwe": "CWE-209",
+      "langs": [
+        "*"
+      ],
+      "pattern": "(?i)(traceback\\.format_exc|format_exc\\(\\)|print_exception|error\\.stack[^;]{0,60}(response|res\\.|jsonify|send)|res\\.(status\\(\\d+\\)\\.)?send\\(\\s*err)",
+      "fix": "对外只返回统一错误码，堆栈写日志。回显堆栈会泄露路径、框架版本、库版本，为后续攻击提供情报。",
+      "tags": [
+        "info-leak"
+      ]
+    },
+    {
+      "id": "SEC705",
+      "title": "权限/鉴权相关未完成标记",
+      "severity": "medium",
+      "cwe": "CWE-1059",
+      "langs": [
+        "*"
+      ],
+      "pattern": "(?i)(TODO|FIXME|XXX|HACK)[^\\n]{0,60}(auth|permission|权限|鉴权|验证|security|token|签名|校验)",
+      "fix": "逐条确认是否已补齐。上线前遗留的鉴权 TODO 是常见的越权入口。",
+      "tags": [
+        "config"
+      ]
+    },
+    {
+      "id": "SEC706",
+      "title": "依赖版本使用浮动范围",
+      "severity": "low",
+      "cwe": "CWE-1104",
+      "langs": [
+        "*"
+      ],
+      "pattern": "(?i)[\"'](flask|django|express|koa|requests|axios|lodash|spring-boot|fastapi)[\"']\\s*:\\s*[\"'](\\*|latest|\\^0|>=0)",
+      "fix": "锁定版本并提交 lock 文件（package-lock.json / poetry.lock / requirements.txt 精确版本），避免构建时被投毒或引入破坏性变更。",
+      "tags": [
+        "dependency"
+      ]
+    },
+    {
+      "id": "SEC801",
+      "title": "innerHTML 赋值（XSS 面）",
+      "severity": "medium",
+      "cwe": "CWE-79",
+      "langs": [
+        "js",
+        "ts",
+        "vue",
+        "html"
+      ],
+      "pattern": "\\.innerHTML\\s*=|outerHTML\\s*=",
+      "fix": "改用 textContent 或 createElement。确需渲染富文本时使用 DOMPurify 先净化。",
+      "tags": [
+        "xss",
+        "frontend"
+      ]
+    },
+    {
+      "id": "SEC802",
+      "title": "React dangerouslySetInnerHTML",
+      "severity": "medium",
+      "cwe": "CWE-79",
+      "langs": [
+        "js",
+        "ts",
+        "jsx",
+        "tsx"
+      ],
+      "pattern": "dangerouslySetInnerHTML",
+      "fix": "内容必须经 DOMPurify.sanitize 处理；白名单标签属性，禁止 script/on* 事件属性。",
+      "tags": [
+        "xss",
+        "frontend"
+      ]
+    },
+    {
+      "id": "SEC803",
+      "title": "document.write 写文档",
+      "severity": "medium",
+      "cwe": "CWE-79",
+      "langs": [
+        "js",
+        "html"
+      ],
+      "pattern": "document\\.write(ln)?\\s*\\(",
+      "fix": "改用 DOM API 插入节点。",
+      "tags": [
+        "xss",
+        "frontend"
+      ]
+    },
+    {
+      "id": "SEC804",
+      "title": "Vue v-html 渲染",
+      "severity": "medium",
+      "cwe": "CWE-79",
+      "langs": [
+        "vue",
+        "html"
+      ],
+      "pattern": "v-html\\s*=",
+      "fix": "v-html 等同于 innerHTML。渲染前用 DOMPurify 处理，或改用插值 {{ }}。",
+      "tags": [
+        "xss",
+        "frontend"
+      ]
+    },
+    {
+      "id": "SEC805",
+      "title": "前端硬编码后端地址或密钥",
+      "severity": "low",
+      "cwe": "CWE-200",
+      "langs": [
+        "html",
+        "vue",
+        "jsx",
+        "tsx",
+        "frontend"
+      ],
+      "pattern": "(?i)(const|let|var)\\s+\\w*(key|secret|token|password)\\w*\\s*=\\s*[\"'][A-Za-z0-9_\\-]{12,}[\"']",
+      "fix": "前端代码对用户完全可见，任何密钥放在前端都等于公开。移回后端并做接口代理。",
+      "tags": [
+        "info-leak",
+        "frontend",
+        "ai"
+      ]
+    },
+    {
+      "id": "SEC901",
+      "title": "大模型 Key 出现在前端可下载代码中",
+      "severity": "critical",
+      "cwe": "CWE-798",
+      "langs": [
+        "html",
+        "vue",
+        "jsx",
+        "tsx",
+        "frontend"
+      ],
+      "pattern": "\\bsk-(proj-)?[A-Za-z0-9_\\-]{20,}\\b|\\bsk-ant-[A-Za-z0-9_\\-]{20,}\\b",
+      "fix": "前端直连大模型会把 key 暴露给每个访客，可被无限盗刷。必须改为前端调自家后端 → 后端持 key 转发，并加用户级限流与配额。",
+      "verify": "打开浏览器 DevTools → Network，查看请求头中是否出现 Authorization: Bearer sk-…。",
+      "tags": [
+        "ai",
+        "credential",
+        "high-risk"
+      ]
+    },
+    {
+      "id": "SEC902",
+      "title": "用户输入直接拼进 Prompt（提示注入面）",
+      "severity": "medium",
+      "cwe": "CWE-1426",
+      "langs": [
+        "python",
+        "js",
+        "ts",
+        "java",
+        "php"
+      ],
+      "pattern": "(?i)(prompt|system_?prompt|messages?|instruction)\\s*[:=]?\\s*[^;\\n]{0,100}(f[\"']|\\.format\\(|\\+\\s*\\w|\\$\\{|\\{\\w+\\})",
+      "fix": "不要把外部输入直接拼进系统提示词。用结构化消息角色隔离（user 内容放 user role），对输入做长度与关键词过滤，并对模型输出做业务规则二次校验。",
+      "tags": [
+        "ai",
+        "prompt-injection"
+      ]
+    },
+    {
+      "id": "SEC903",
+      "title": "大模型输出被直接执行或落库（RCE/SQL 面）",
+      "severity": "critical",
+      "cwe": "CWE-1427",
+      "langs": [
+        "*"
+      ],
+      "pattern": "(?i)(eval|exec|subprocess|os\\.system|popen|query|execute|cursor\\.\\w+|run\\s*\\()\\s*\\([^)]{0,200}(llm|completion|response|answer|generated|ai_?output|model_?output|gpt_?result|\\.content)",
+      "fix": "模型输出等同于不可信外部输入，绝不可直接 eval / 拼 SQL / 当命令执行。必须经过严格解析（结构化输出 + schema 校验）与白名单过滤。",
+      "verify": "构造一个让模型输出 `\\'; DROP TABLE x; --` 或 `__import__('os').system('id')` 的输入，观察是否被执行。",
+      "tags": [
+        "ai",
+        "rce",
+        "high-risk"
+      ]
+    },
+    {
+      "id": "SEC904",
+      "title": "Agent 工具/函数缺少权限校验",
+      "severity": "medium",
+      "cwe": "CWE-862",
+      "langs": [
+        "python",
+        "js",
+        "ts"
+      ],
+      "pattern": "(?i)(@tool|def\\s+\\w*tool\\w*\\s*\\(|tools\\s*=\\s*\\[)",
+      "fix": "逐个复核 Agent 可调用的工具：是否有权限判断、是否有参数边界、是否只读。写操作类工具（发邮件/转账/删数据）必须二次确认或人工审批。",
+      "tags": [
+        "ai",
+        "agent"
+      ]
+    },
+    {
+      "id": "SEC905",
+      "title": "MCP / 工具配置中明文存放密钥",
+      "severity": "high",
+      "cwe": "CWE-798",
+      "langs": [
+        "json",
+        "yaml",
+        "yml",
+        "toml"
+      ],
+      "pattern": "(?i)\"(env|headers)\"\\s*:\\s*\\{[^}]{0,400}\"[^\"]{0,40}(API_?KEY|TOKEN|SECRET|PASSWORD)[^\"]{0,40}\"\\s*:",
+      "fix": "MCP 配置文件常被提交或分享，env/headers 中的密钥等于明文外泄。改用系统环境变量引用或密钥服务。",
+      "tags": [
+        "ai",
+        "mcp",
+        "credential"
+      ]
+    },
+    {
+      "id": "SEC906",
+      "title": "向量库 / 模型服务裸暴露",
+      "severity": "low",
+      "cwe": "CWE-306",
+      "langs": [
+        "*"
+      ],
+      "pattern": "(?i)(qdrant|milvus|weaviate|chroma|ollama|vllm|text-generation-inference)[^\\n]{0,80}(localhost|127\\.0\\.0\\.1|0\\.0\\.0\\.0|http://)",
+      "fix": "确认这些服务未暴露到公网。向量库默认无鉴权，暴露后知识库内容可被整库拉走。",
+      "tags": [
+        "ai",
+        "network"
+      ]
+    },
+    {
+      "id": "SEC115",
+      "title": "硬编码支付平台生产密钥",
+      "severity": "critical",
+      "cwe": "CWE-798",
+      "langs": [
+        "*"
+      ],
+      "pattern": "(?i)\\b(sk_live_|rk_live_)[0-9a-zA-Z]{16,}\\b",
+      "fix": "支付平台生产密钥泄露可直接造成资金损失。立即在支付平台后台吊销并重新签发，密钥只保存在服务端密钥服务中，前端代码与代码仓库不得出现。",
+      "verify": "在支付平台后台查看该密钥的调用记录，确认无异常扣款、退款或转账操作。",
+      "tags": [
+        "credential",
+        "payment"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<!--
+  演示样本：运营后台页面
+  覆盖前端类缺陷：前端硬编码大模型 Key、innerHTML、document.write、v-html
+-->
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <title>运营后台 · 演示样本</title>
+</head>
+<body>
+  <div id="panel"></div>
+  <div id="banner"></div>
+
+  <script>
+    // 前端直接持有大模型 Key —— 任何访客都能在 DevTools 里看到
+    const OPENAI_API_KEY = "sk-proj-9Rt1Lb6Wy3Hd8Ae5Uc0JgQk7Zx2Nm4Pv";
+    const ADMIN_TOKEN = "admin-static-token-8f3a2b1c";
+
+    async function askCopilot(question) {
+      const resp = await fetch("https://api.example-llm.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer " + OPENAI_API_KEY,
+        },
+        body: JSON.stringify({
+          model: "gpt-4o-mini",
+          messages: [{ role: "user", content: question }],
+        }),
+      });
+      const data = await resp.json();
+      document.getElementById("panel").innerHTML = data.choices[0].message.content;
+      return data;
+    }
+
+    function renderNotice(userInput) {
+      document.write("<div class='notice'>" + userInput + "</div>");
+    }
+  </script>
+</body>
+</html>

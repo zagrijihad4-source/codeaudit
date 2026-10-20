@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>代码安全体检 · 上线前把风险挡在门外</title>
+<meta name="description" content="面向中小团队与 AI 应用的代码安全体检服务：交付可读的中文报告、可执行的修复方案、可验证的整改结果。">
+<style>
+  :root{--ink:#12161f;--muted:#5c6470;--line:#e6e9ee;--brand:#1f5eff;
+        --brand2:#0b3fd1;--bg:#ffffff;--soft:#f5f7fa;--warn:#e8710a}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:16px/1.75 -apple-system,"Segoe UI","Microsoft YaHei",sans-serif;
+    -webkit-font-smoothing:antialiased}
+  .wrap{max-width:1040px;margin:0 auto;padding:0 22px}
+  header{background:linear-gradient(150deg,#0b1220,#17233d 60%,#1f3a6e);
+    color:#fff;padding:76px 0 68px}
+  header .tag{display:inline-block;background:rgba(255,255,255,.12);
+    border:1px solid rgba(255,255,255,.2);border-radius:100px;
+    padding:5px 14px;font-size:13px;letter-spacing:.6px;margin-bottom:22px}
+  h1{font-size:40px;line-height:1.28;margin:0 0 18px;letter-spacing:-.5px}
+  header p.lead{font-size:18px;opacity:.85;max-width:640px;margin:0 0 30px}
+  .cta{display:flex;gap:14px;flex-wrap:wrap;align-items:center}
+  .btn{display:inline-block;background:var(--brand);color:#fff;text-decoration:none;
+    padding:13px 30px;border-radius:9px;font-weight:600;font-size:15.5px}
+  .btn.ghost{background:transparent;border:1px solid rgba(255,255,255,.34)}
+  .btn:hover{filter:brightness(1.08)}
+  .stats{display:flex;gap:40px;margin-top:44px;flex-wrap:wrap;font-size:14px;opacity:.8}
+  .stats b{display:block;font-size:26px;opacity:1;line-height:1.3}
+  section{padding:64px 0;border-bottom:1px solid var(--line)}
+  h2{font-size:28px;margin:0 0 12px;letter-spacing:-.3px}
+  .sub{color:var(--muted);margin:0 0 36px;max-width:660px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:20px}
+  .card{background:var(--soft);border:1px solid var(--line);border-radius:13px;
+    padding:24px 22px}
+  .card h3{margin:0 0 9px;font-size:17px}
+  .card p{margin:0;color:var(--muted);font-size:14.5px}
+  .card .ico{font-size:22px;margin-bottom:10px;display:block}
+  .plans .card{background:#fff;display:flex;flex-direction:column}
+  .entbar{display:flex;align-items:center;justify-content:space-between;gap:22px;
+    flex-wrap:wrap;background:#0b1220;color:#fff;border-radius:13px;
+    padding:22px 26px;margin-top:20px}
+  .entbar .t{font-size:16.5px;font-weight:600}
+  .entbar .d{font-size:13.5px;line-height:1.65;opacity:.75;margin-top:6px;max-width:600px}
+  .entbar .p{font-size:23px;font-weight:700;white-space:nowrap}
+  .entbar .p small{font-size:13px;font-weight:400;opacity:.7}
+  .plans .card.hot{border:2px solid var(--brand);box-shadow:0 10px 34px rgba(31,94,255,.13);
+    position:relative}
+  .plans .card.hot::after{content:"最多人选";position:absolute;top:-13px;right:20px;
+    background:var(--brand);color:#fff;font-size:12px;padding:3px 12px;border-radius:20px}
+  .price{font-size:32px;font-weight:700;margin:12px 0 4px;letter-spacing:-.5px}
+  .price small{font-size:14px;font-weight:400;color:var(--muted)}
+  .plans ul{list-style:none;padding:0;margin:16px 0 22px;font-size:14.5px}
+  .plans li{padding:6px 0 6px 24px;position:relative;color:#2c3340}
+  .plans li::before{content:"✓";position:absolute;left:0;color:#1a9c53;font-weight:700}
+  .plans .btn{margin-top:auto;text-align:center}
+  table{width:100%;border-collapse:collapse;font-size:15px}
+  th,td{text-align:left;padding:13px 14px;border-bottom:1px solid var(--line);
+    vertical-align:top}
+  th{background:var(--soft);color:var(--muted);font-size:13.5px;font-weight:600}
+  .steps{counter-reset:s}
+  .step{position:relative;padding-left:52px;margin-bottom:26px}
+  .step::before{counter-increment:s;content:counter(s);position:absolute;left:0;top:0;
+    width:34px;height:34px;border-radius:50%;background:#eaf0ff;color:var(--brand2);
+    display:flex;align-items:center;justify-content:center;font-weight:700}
+  .step h3{margin:0 0 5px;font-size:16.5px}
+  .step p{margin:0;color:var(--muted);font-size:14.5px}
+  details{background:var(--soft);border:1px solid var(--line);border-radius:10px;
+    padding:16px 20px;margin-bottom:12px}
+  summary{cursor:pointer;font-weight:600;font-size:15.5px}
+  details p{margin:12px 0 0;color:var(--muted);font-size:14.5px}
+  footer{background:#0b1220;color:rgba(255,255,255,.72);padding:46px 0;
+    font-size:14px}
+  footer a{color:#8fb0ff;text-decoration:none}
+  .note{font-size:13px;color:var(--muted);margin-top:34px;line-height:1.8}
+  @media(max-width:640px){h1{font-size:29px}header{padding:56px 0 50px}
+    .stats{gap:24px}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <span class="tag">代码安全体检 · 面向中小团队与 AI 应用</span>
+    <h1>上线前，把能让你赔钱的风险<br>先挡在门外</h1>
+    <p class="lead">
+      静态扫描 + 数据流追踪 + 人工验证，交付一份你团队能看懂、能照着改、
+      改完能验证的中文安全报告——不是一份堆满英文缩写的扫描日志。
+    </p>
+    <div class="cta">
+      <a class="btn" href="#pricing">查看服务与报价</a>
+      <a class="btn ghost" href="#sample">先看一份样例报告</a>
+    </div>
+    <div class="stats">
+      <span><b>60</b>条检测规则</span>
+      <span><b>9</b>大类风险覆盖</span>
+      <span><b>3</b>个工作日交付</span>
+      <span><b>0</b>依赖、可私有化部署</span>
+    </div>
+  </div>
+</header>
+
+<section>
+  <div class="wrap">
+    <h2>你可能正面临这些事</h2>
+    <p class="sub">多数团队不是不重视安全，而是没有一个能落地的入口。</p>
+    <div class="grid">
+      <div class="card"><span class="ico">🔑</span><h3>密钥写死在代码里</h3>
+        <p>大模型 Key 放在前端、数据库口令写进配置、云 AK 提交进了 Git。
+           一旦泄露，账单和数据的损失都是实打实的。</p></div>
+      <div class="card"><span class="ico">🤖</span><h3>上了 AI 功能，没人评估风险</h3>
+        <p>Prompt 直接拼用户输入、模型返回内容被拿去执行或拼 SQL、
+           Agent 工具能直接改数据——这类问题传统的扫描工具根本不看。</p></div>
+      <div class="card"><span class="ico">📋</span><h3>客户或招标要求安全证明</h3>
+        <p>对方要你提供安全评估材料，你手上只有一份开源的英文扫描结果，
+           既看不懂也交不出去。</p></div>
+      <div class="card"><span class="ico">🧯</span><h3>出事了才排查</h3>
+        <p>被拖库、被刷接口、被薅算力额度，事后复盘才发现问题半年前就躺在代码里。</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="deliver">
+  <div class="wrap">
+    <h2>你拿到的不是一份日志，是一份整改清单</h2>
+    <p class="sub">每一处问题都对应三样东西，缺一样这份报告就不算交付完成。</p>
+    <table>
+      <thead><tr><th style="width:22%">交付项</th><th>具体是什么</th></tr></thead>
+      <tbody>
+        <tr><td><b>问题定位</b></td>
+            <td>文件、行号、命中的检测规则与对应的 CWE 标准编号，开发可以直接跳过去看</td></tr>
+        <tr><td><b>风险说明</b></td>
+            <td>用业务语言讲清楚「这个问题会被怎样利用、会造成什么损失」，而不是抛一个术语</td></tr>
+        <tr><td><b>修复建议</b></td>
+            <td>给出具体改法，包含推荐的 API 或配置形态；关键问题附「如何验证已修好」的操作步骤</td></tr>
+      </tbody>
+    </table>
+    <p class="note">
+      · 报告中的密钥会做打码处理，可安全转发给同事或客户。<br>
+      · HTML 报告为单文件、无外部依赖，双击即可打开，不需要安装任何环境。<br>
+      · 需要接入 CI 的团队可获得命令行接入方式，每次提交自动出风险分。
+    </p>
+  </div>
+</section>
+
+<section id="pricing">
+  <div class="wrap">
+    <h2>服务与报价</h2>
+    <p class="sub">先用 299 块看一份报告长什么样，觉得有用再谈完整的。前三个客户有破冰折扣。</p>
+    <div class="grid plans">
+      <div class="card">
+        <h3>体验款</h3>
+        <div class="price">¥299<small> / 次</small></div>
+        <p style="color:var(--muted);font-size:14px">先花一顿饭钱，看看报告长什么样</p>
+        <ul>
+          <li>单个仓库或单个模块</li>
+          <li>24 小时内交付</li>
+          <li>HTML + Markdown 报告</li>
+          <li>严重问题逐条修复建议</li>
+          <li>不含人工复核与答疑</li>
+        </ul>
+        <a class="btn" href="#contact">先试一单</a>
+      </div>
+      <div class="card hot">
+        <h3>标准款</h3>
+        <div class="price">¥1,280<small> / 次</small></div>
+        <p style="color:var(--muted);font-size:14px">主力款，上线前该扫的一次扫干净</p>
+        <ul>
+          <li>20 万行以内代码</li>
+          <li>3 个工作日交付</li>
+          <li>体验款全部内容</li>
+          <li>人工复核，逐条剔除误报</li>
+          <li>30 分钟线上答疑</li>
+        </ul>
+        <a class="btn" href="#contact">预约体检</a>
+      </div>
+      <div class="card">
+        <h3>专业款</h3>
+        <div class="price">¥2,980<small> / 次</small></div>
+        <p style="color:var(--muted);font-size:14px">适合有客户审阅或合规要求的团队</p>
+        <ul>
+          <li>100 万行以内代码</li>
+          <li>5 个工作日交付</li>
+          <li>标准款全部内容</li>
+          <li>高危问题复现验证</li>
+          <li>修复方案评审 + 1 次免费复测</li>
+          <li>可出具英文摘要供客户审阅</li>
+        </ul>
+        <a class="btn" href="#contact">预约专业款</a>
+      </div>
+    </div>
+
+    <div class="entbar">
+      <div>
+        <div class="t">企业款 · 业务复杂，或已经出过安全事件</div>
+        <div class="d">代码规模不限，含人工审计、授权范围内验证、业务逻辑与权限设计审查，
+          AI 应用专项（提示注入 / 模型输出 / Agent 越权 / RAG 数据边界）、整改方案与复测报告，可按季度订阅。</div>
+      </div>
+      <div class="p">¥8,800<small> 起</small></div>
+      <a class="btn" href="#contact">联系我们评估</a>
+    </div>
+    <p class="note">
+      所有检测工作均仅在客户自有系统的书面授权范围内进行，检测过程不影响线上业务，测试数据不外带。
+    </p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>怎么进行</h2>
+    <p class="sub">从提交代码到拿到报告，通常不需要你方投入超过 2 小时。</p>
+    <div class="steps">
+      <div class="step"><h3>1 · 沟通范围（15 分钟）</h3>
+        <p>确认代码范围、技术栈、上线时间点和最担心的问题，给出报价与排期。</p></div>
+      <div class="step"><h3>2 · 提交代码（10 分钟）</h3>
+        <p>提供代码压缩包、Git 仓库只读权限或私有化部署的扫描工具，三种方式任选。
+           支持在我们的机器上跑，也支持工具部署到你方内网、代码不出门。</p></div>
+      <div class="step"><h3>3 · 检测与验证</h3>
+        <p>自动化扫描覆盖 60 条规则、9 大类风险，高危项人工复现确认，剔除误报。</p></div>
+      <div class="step"><h3>4 · 交付与答疑</h3>
+        <p>交付报告并开一次线上会，逐条过严重与高危项，开发当场能提问。
+           体验款不含这一步；需要逐条讲解请选标准款及以上。</p></div>
+      <div class="step"><h3>5 · 复测（专业款及以上）</h3>
+        <p>修复完成后重新扫描，输出复测对比，确认问题真正关闭。</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="sample">
+  <div class="wrap">
+    <h2>常见问题</h2>
+    <details><summary>代码涉密，不能外发怎么办？</summary>
+      <p>检测工具本身零依赖、可完全部署在你方内网，代码不出门。
+         我们可以只交付工具与规则库，由你方自行执行，我们负责结果解读与修复指导。</p></details>
+    <details><summary>和免费的扫描工具有什么区别？</summary>
+      <p>免费工具给你的是告警列表，你要自己判断哪些是真的、怎么改。
+         我们交付的是已经过误报剔除、按处理优先级排序、每一条都写了改法和验证方式的整改清单，
+         并且专门覆盖了大模型应用特有的风险类别——这部分目前大多数工具不检测。</p></details>
+    <details><summary>我们已经在用 AI 写代码了，还有必要做吗？</summary>
+      <p>AI 生成的代码在安全模式上更容易出现「看起来对、实际不安全」的写法，
+         尤其是密钥处理、SQL 拼接和权限判断。这正是需要加一道自动化检查的场景。</p></details>
+    <details><summary>299 的体验款和 1280 的标准款到底差在哪？</summary>
+      <p>差在人工。体验款是把工具跑一遍、把报告发给你，便宜，但哪些是真问题要你自己判断；
+         标准款是逐条复核过误报、按修复优先级排好序、并且开一次会讲清楚每一处怎么改。
+         多数客户先买体验款，看完报告就明白为什么需要第二步。</p></details>
+    <details><summary>预算有限，能不能再便宜点？</summary>
+      <p>可以降范围，不降单价。你有三个仓库就先扫最核心的那个，按单仓库计价；
+         或者只扫这次要上线的模块。价格跟着交付量走，拆开买对你更划算。
+         前三个客户我们有破冰折扣，直接问就行。</p></details>
+    <details><summary>报告能不能用于对外交付？</summary>
+      <p>专业款及以上可提供英文摘要，供你方在客户审阅、供应商评估或招标材料中引用。
+         报告中的敏感信息均已打码。</p></details>
+  </div>
+</section>
+
+<footer id="contact">
+  <div class="wrap">
+    <h2 style="color:#fff;font-size:22px">先把最危险的那几条找出来</h2>
+    <p style="max-width:600px">
+      发一份代码结构说明过来，我们先免费做一次范围评估，
+      告诉你哪些文件最值得优先检测、大概需要多少工作量。
+    </p>
+    <p style="margin-top:22px">
+      微信：<b style="color:#fff">your-wechat-id</b>　│　邮箱：<b style="color:#fff">you@example.com</b><br>
+      <span style="font-size:13px;opacity:.7">（替换为你的实际联系方式后即可发布）</span>
+    </p>
+    <p style="margin-top:30px;font-size:13px;opacity:.6">
+      © 2026 代码安全体检服务 · 本页为落地页模板，发布前请替换联系方式与文案细节。
+    </p>
+  </div>
+</footer>
+
+</body>
+</html>

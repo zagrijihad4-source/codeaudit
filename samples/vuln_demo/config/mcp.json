@@ -1,0 +1,27 @@
+{
+  "_comment": "演示样本：MCP 服务配置（密钥明文存放，会被随仓库或分享外泄）",
+  "mcpServers": {
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "ghp_A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q7r8"
+      }
+    },
+    "postgres": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-postgres"],
+      "env": {
+        "DATABASE_URL": "postgresql://readonly:S3cret%402024@10.20.30.41:5432/shop"
+      }
+    },
+    "vector-db": {
+      "command": "python",
+      "args": ["-m", "mcp_server_qdrant"],
+      "env": {
+        "QDRANT_URL": "http://127.0.0.1:6333",
+        "QDRANT_API_KEY": "qdrant-local-dev-key-2024"
+      }
+    }
+  }
+}
